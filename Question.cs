@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,10 +8,11 @@ using System.Threading.Tasks;
 namespace GovGuideBot
 {
     internal class Question
-    {
-        public string title;
-        public string question;
-        public int user_id;
-        public int category_id;
+    {        
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("question")]
+        public string QuestionTitle { get; set; }
     }
 }

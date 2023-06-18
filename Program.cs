@@ -14,7 +14,8 @@ namespace TelegramBotExperiments
     {
         static ITelegramBotClient bot = new TelegramBotClient("6202454519:AAFLc_XRZKF3Be4Qkk1kAiuygUkIdKdR7HA");
         static string ipTarget = "http://192.168.43.33:2323/api/";
-        static string questions = "chat/query";
+        static string conversationChatGPT = "chat/query";
+        static string questions = "question/get/1";
         static string instructions = "instruction/document/";
         static string instructionsByCategory = "instruction/get/by/category/";
         static string categories = "category/get/all";
@@ -53,30 +54,7 @@ namespace TelegramBotExperiments
                             await ShowAllCategories(message.Chat);
                             return;
                         default:
-                            var httpClient = new HttpClient();
-                            Request request = new Request();
-                            request.query = requestMessage;
-
-                            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                            httpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("utf-8")); // Specify UTF-8 encoding
-
-                            var serializedRequest = JsonConvert.SerializeObject(request);
-
-                            var httpContent = new StringContent(serializedRequest, Encoding.UTF8, "application/json");
-                            var response = await httpClient.PostAsync(ipTarget + questions, httpContent);
-                            var responseContent = await response.Content.ReadAsStringAsync();
-                            var responseToUserGPT = JsonConvert.DeserializeObject<GovGuideBot.ChatGPT.DataWrapper>(responseContent);
-                            await botClient.SendTextMessageAsync(message.Chat, responseToUserGPT.Data.Answer);
-                            if (responseToUserGPT.Data.Instructions.Length > 0)
-                            {
-                                List<InlineKeyboardButton[]> buttons = new List<InlineKeyboardButton[]>();
-                                foreach (var item in responseToUserGPT.Data.Instructions)
-                                {
-                                    buttons.Add(new[] { new InlineKeyboardButton(item.Title) { Url = ipTarget + instructions + item.Id } });
-                                }
-                                var inlineKeyboard = new InlineKeyboardMarkup(buttons);
-                                await bot.SendTextMessageAsync(message.Chat, "Можете перейти по ссылкам:\nТөмөнкү шилтемелерди бассаңыз болот:", replyMarkup: inlineKeyboard);
-                            }
+                            await ConversateWithChatGPT(requestMessage,message.Chat);
                             break;
                     }
                 }
@@ -96,6 +74,43 @@ namespace TelegramBotExperiments
             catch (Exception e)
             {
                 await Console.Out.WriteLineAsync(e + "");
+            }
+        }
+        public static async Task ConversateWithChatGPT(string requestMessage,ChatId chatId)
+        {
+            var httpClient = new HttpClient();
+            Request request = new Request();
+            request.query = requestMessage;
+
+            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            httpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("utf-8")); // Specify UTF-8 encoding
+
+            var serializedRequest = JsonConvert.SerializeObject(request);
+
+            var httpContent = new StringContent(serializedRequest, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(ipTarget + conversationChatGPT, httpContent);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var responseToUserGPT = JsonConvert.DeserializeObject<GovGuideBot.ChatGPT.DataWrapper>(responseContent);
+            await bot.SendTextMessageAsync(chatId, responseToUserGPT.Data.Answer);
+            if (responseToUserGPT.Data.Instructions.Length > 0)
+            {
+                List<InlineKeyboardButton[]> buttons = new List<InlineKeyboardButton[]>();
+                foreach (var item in responseToUserGPT.Data.Instructions)
+                {
+                    buttons.Add(new[] { new InlineKeyboardButton(item.Title) { Url = ipTarget + instructions + item.Id } });
+                }
+                var inlineKeyboard = new InlineKeyboardMarkup(buttons);
+                await bot.SendTextMessageAsync(chatId, "Можете посмотреть эти инструкции:\nТөмөнкү инструкцияларды изилдесеңиз болот:", replyMarkup: inlineKeyboard);
+            }
+            if (responseToUserGPT.Data.PopularQuestions.Length > 0)
+            {
+                List<InlineKeyboardButton[]> buttons = new List<InlineKeyboardButton[]>();
+                foreach (var item in responseToUserGPT.Data.PopularQuestions)
+                {
+                    buttons.Add(new[] { new InlineKeyboardButton(item.QuestionTitle) { Url = ipTarget + instructions + item.Id } });
+                }
+                var inlineKeyboard = new InlineKeyboardMarkup(buttons);
+                await bot.SendTextMessageAsync(chatId, "Можете посмотреть на эти ссылки:\nТөмөнкү шилтемелерди изилдесеңиз болот:", replyMarkup: inlineKeyboard);
             }
         }
         public static async Task ShowAllCategories(ChatId chatId)
