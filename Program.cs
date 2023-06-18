@@ -25,7 +25,7 @@ namespace TelegramBotExperiments
                 if (update.Type == UpdateType.Message)
                 {
                     var date = update.Message!.Date;
-                    var datemes = DateTime.UtcNow - (date);// ..HasValue ? date.Value : DateTime.UtcNow);
+                    var datemes = DateTime.UtcNow - (date);
                     await Console.Out.WriteLineAsync(datemes.Seconds + "___seconds");
                     if (datemes.Seconds > 30)
                         return;
@@ -42,34 +42,18 @@ namespace TelegramBotExperiments
 
                             var keyboardButtons = new[]
                             {
-                            new KeyboardButton("Категории")
-                        };
+                                new KeyboardButton("Категории")
+                            };
 
                             var replyKeyboardMarkup = new ReplyKeyboardMarkup(keyboardButtons);
                             replyKeyboardMarkup.ResizeKeyboard = true;
                             await bot.SendTextMessageAsync(message.Chat, "Choose an option:", replyMarkup: replyKeyboardMarkup);
                             return;
                         case "категории":
-                            var httpClient = new HttpClient();
-
-                            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                            httpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("utf-8")); // Specify UTF-8 encoding
-
-                            var response = await httpClient.GetAsync(ipTarget + categories);
-                            var responseContent = await response.Content.ReadAsStringAsync();
-
-                            var responseToUser = JsonConvert.DeserializeObject<GovGuideBot.Categories.DataWrapper>(responseContent);
-                            await Console.Out.WriteLineAsync(responseContent + "categoriess____________");
-                            List<InlineKeyboardButton[]> buttonsCat = new List<InlineKeyboardButton[]>();
-                            foreach (var item in responseToUser.Data)
-                            {
-                                buttonsCat.Add(new[] { new InlineKeyboardButton(item.Name) { CallbackData = item.Id.ToString() } });
-                            }
-                            var inlineKeyboard = new InlineKeyboardMarkup(buttonsCat);
-                            await bot.SendTextMessageAsync(message.Chat, "Выберите категорию:\nКатегория тандаңыз:", replyMarkup: inlineKeyboard);
+                            await ShowAllCategories(message.Chat);
                             return;
                         default:
-                            httpClient = new HttpClient();
+                            var httpClient = new HttpClient();
                             Request request = new Request();
                             request.query = requestMessage;
 
@@ -79,8 +63,8 @@ namespace TelegramBotExperiments
                             var serializedRequest = JsonConvert.SerializeObject(request);
 
                             var httpContent = new StringContent(serializedRequest, Encoding.UTF8, "application/json");
-                            response = await httpClient.PostAsync(ipTarget + questions, httpContent);
-                            responseContent = await response.Content.ReadAsStringAsync();
+                            var response = await httpClient.PostAsync(ipTarget + questions, httpContent);
+                            var responseContent = await response.Content.ReadAsStringAsync();
                             var responseToUserGPT = JsonConvert.DeserializeObject<GovGuideBot.ChatGPT.DataWrapper>(responseContent);
                             await botClient.SendTextMessageAsync(message.Chat, responseToUserGPT.Data.Answer);
                             if (responseToUserGPT.Data.Instructions.Length > 0)
@@ -90,7 +74,7 @@ namespace TelegramBotExperiments
                                 {
                                     buttons.Add(new[] { new InlineKeyboardButton(item.Title) { Url = ipTarget + instructions + item.Id } });
                                 }
-                                inlineKeyboard = new InlineKeyboardMarkup(buttons);
+                                var inlineKeyboard = new InlineKeyboardMarkup(buttons);
                                 await bot.SendTextMessageAsync(message.Chat, "Можете перейти по ссылкам:\nТөмөнкү шилтемелерди бассаңыз болот:", replyMarkup: inlineKeyboard);
                             }
                             break;
@@ -100,21 +84,40 @@ namespace TelegramBotExperiments
                 if (update.Type == UpdateType.CallbackQuery)
                 {
                     var date = update.CallbackQuery!.Message.Date;
-                    var datemes = DateTime.UtcNow - (date);// ..HasValue ? date.Value : DateTime.UtcNow);
-                    await Console.Out.WriteLineAsync(datemes.Seconds + "___seconds");
+                    var datemes = DateTime.UtcNow - (date);
                     if (datemes.Seconds > 30)
                         return;
 
                     var callbackQuery = update.CallbackQuery;
                     var data = callbackQuery.Data;
-                    await Console.Out.WriteLineAsync(data + "____");
-                    ShowInstructions(data, update.CallbackQuery.ChatInstance);
+                    await ShowInstructions(data, callbackQuery.Message.Chat.Id);
                 }
             }
             catch (Exception e)
             {
                 await Console.Out.WriteLineAsync(e + "");
             }
+        }
+        public static async Task ShowAllCategories(ChatId chatId)
+        {
+            var httpClient = new HttpClient();
+
+            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            httpClient.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("utf-8")); // Specify UTF-8 encoding
+
+            var response = await httpClient.GetAsync(ipTarget + categories);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            var responseToUser = JsonConvert.DeserializeObject<GovGuideBot.Categories.DataWrapper>(responseContent);
+            await Console.Out.WriteLineAsync(responseToUser.Data.Length + "categories____________Count");
+            List<InlineKeyboardButton[]> buttonsCat = new List<InlineKeyboardButton[]>();
+
+            foreach (var item in responseToUser.Data)
+            {
+                buttonsCat.Add(new[] { new InlineKeyboardButton(item.Name) { CallbackData = item.Id.ToString() } });
+            }
+            var inlineKeyboard = new InlineKeyboardMarkup(buttonsCat);
+            await bot.SendTextMessageAsync(chatId, "Выберите категорию:\nКатегория тандаңыз:", replyMarkup: inlineKeyboard);
         }
         public static async Task ShowInstructions(string categoryId, ChatId chatId)
         {
@@ -127,15 +130,17 @@ namespace TelegramBotExperiments
             var responseContent = await response.Content.ReadAsStringAsync();
 
             var responseToUser = JsonConvert.DeserializeObject<GovGuideBot.Instructions.DataWrapper>(responseContent);
-            await Console.Out.WriteLineAsync(responseContent + "___________instructions");
+
             List<InlineKeyboardButton[]> buttonsCat = new List<InlineKeyboardButton[]>();
             foreach (var item in responseToUser.Data)
             {
                 buttonsCat.Add(new[] { new InlineKeyboardButton(item.Title) { Url = ipTarget + instructions + item.Id.ToString() } });
             }
+            await Console.Out.WriteLineAsync(buttonsCat.Count + "___________instructions");
             var inlineKeyboard = new InlineKeyboardMarkup(buttonsCat);
             await bot.SendTextMessageAsync(chatId, "Выберите инструкцию:\nИнструкцияны тандаңыз:", replyMarkup: inlineKeyboard);
         }
+
         public static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
             Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
